@@ -78,6 +78,14 @@ module ViewComponent
     # For CSRF authenticity tokens in forms
     delegate :form_authenticity_token, :protect_against_forgery?, :config, to: :helpers
 
+    # Rails 8.2+ doesn't render authenticity tokens when the view context says
+    # not to, as under the `:header_only` forgery protection strategy.
+    #
+    # @private
+    def embed_authenticity_token?
+      !helpers.respond_to?(:embed_authenticity_token?) || helpers.embed_authenticity_token?
+    end
+
     # HTML construction methods
     delegate :output_buffer, :lookup_context, :view_renderer, :view_flow, to: :helpers
 
