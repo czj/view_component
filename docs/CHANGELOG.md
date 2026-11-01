@@ -10,6 +10,10 @@ nav_order: 6
 
 ## main
 
+* Forward `embed_authenticity_token?` to the view context, so under Rails 8.2's `:header_only` forgery protection strategy, forms and `button_to` in components render no authenticity token and `csrf_meta_tags` renders nothing, as they do in views.
+
+    *Clément Joubert*
+
 * Prevent self-cache key collisions and track component references in views and format-specific partial dependencies.
 
     *Joel Hawksley*

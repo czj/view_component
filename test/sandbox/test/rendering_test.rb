@@ -212,6 +212,60 @@ class RenderingTest < ViewComponent::TestCase
     ActionController::Base.allow_forgery_protection = old_value
   end
 
+  def test_embed_authenticity_token_follows_the_view_context
+    vc_test_view_context.define_singleton_method(:embed_authenticity_token?) { false }
+    component = MyComponent.new
+    render_inline(component)
+
+    refute component.embed_authenticity_token?
+  end
+
+  def test_embed_authenticity_token_without_it_on_the_view_context
+    component = MyComponent.new
+    component.render_in(ActionView::Base.empty)
+
+    assert component.embed_authenticity_token?
+  end
+
+  def test_renders_button_to_without_authenticity_token_under_header_only_forgery_protection
+    with_header_only_forgery_protection { render_inline(ButtonToComponent.new) { "foo" } }
+
+    assert_selector("form[class='button_to'][action='/'][method='post']")
+    assert_no_selector("input[name='authenticity_token']", visible: false)
+    assert_nil vc_test_request.env[ActionController::RequestForgeryProtection::CSRF_TOKEN]
+  end
+
+  def test_renders_form_with_without_authenticity_token_under_header_only_forgery_protection
+    with_header_only_forgery_protection { render_inline(FormWithComponent.new) }
+
+    assert_selector("form[action='/']")
+    assert_no_selector("input[name='authenticity_token']", visible: false)
+  end
+
+  class CsrfMetaTagsComponent < ViewComponent::Base
+    def call
+      csrf_meta_tags
+    end
+  end
+
+  def test_renders_no_csrf_meta_tags_under_header_only_forgery_protection
+    with_header_only_forgery_protection { render_inline(CsrfMetaTagsComponent.new) }
+
+    assert_no_selector("meta[name='csrf-token']", visible: false)
+  end
+
+  class ButtonToWithAuthenticityTokenComponent < ViewComponent::Base
+    def call
+      button_to("foo", root_path, authenticity_token: true)
+    end
+  end
+
+  def test_renders_requested_authenticity_token_under_header_only_forgery_protection
+    with_header_only_forgery_protection { render_inline(ButtonToWithAuthenticityTokenComponent.new) }
+
+    assert_selector("input[name='authenticity_token']", visible: false)
+  end
+
   def test_renders_component_with_variant
     with_variant :phone do
       render_inline(VariantsComponent.new)
@@ -1412,5 +1466,23 @@ class RenderingTest < ViewComponent::TestCase
     render_inline(I18nTestComponent.new)
 
     assert_selector("div", text: I18n.t("rendering_test.i18n_test_component.message"))
+  end
+
+  private
+
+  def with_header_only_forgery_protection
+    skip unless ActionController::Base.private_method_defined?(:embed_authenticity_token?)
+
+    begin
+      old_allow_forgery_protection = ActionController::Base.allow_forgery_protection
+      old_verification_strategy = ActionController::Base.forgery_protection_verification_strategy
+      ActionController::Base.allow_forgery_protection = true
+      ActionController::Base.forgery_protection_verification_strategy = :header_only
+
+      yield
+    ensure
+      ActionController::Base.allow_forgery_protection = old_allow_forgery_protection
+      ActionController::Base.forgery_protection_verification_strategy = old_verification_strategy
+    end
   end
 end
